@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Caffé Moment | 咖啡日记</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="咖啡日记">
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#6f4e37">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.4/dist/gsap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Quicksand:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --coffee-dark: #3d2b1f;
+            --coffee-medium: #6f4e37;
+            --coffee-light: #c0a080;
+            --coffee-cream: #fdfcfb;
+            --accent-green: #6b8e23;
+        }
+        body {
+            font-family: 'Quicksand', 'Noto+Serif+SC', sans-serif;
+            background-color: var(--coffee-cream);
+            color: var(--coffee-dark);
+            background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
+            background-size: 20px 20px;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .serif { font-family: 'Noto Serif SC', serif; }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 32px 0 rgba(111, 78, 55, 0.1);
+        }
+        .coffee-gradient {
+            background: linear-gradient(135deg, #6f4e37 0%, #3d2b1f 100%);
+        }
+        .rating-star {
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .rating-star:hover {
+            transform: scale(1.2);
+        }
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: var(--coffee-light);
+            border-radius: 10px;
+        }
+        .floating {
+            animation: floating 3s ease-in-out infinite;
+        }
+        @keyframes floating {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+            100% { transform: translateY(0px); }
+        }
+        .entry-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .entry-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.08);
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-20">
+
+    <nav class="p-6 flex justify-between items-center max-w-5xl mx-auto">
+        <div class="flex items-center space-x-2">
+            <div class="w-10 h-10 coffee-gradient rounded-xl flex items-center justify-center text-white shadow-lg">
+                <i class="fas fa-mug-hot text-xl"></i>
+            </div>
+            <h1 class="text-2xl font-bold tracking-tight serif">Caffé Moment</h1>
+        </div>
+        <button onclick="openModal()" class="bg-[#6f4e37] text-white px-5 py-2.5 rounded-full font-medium hover:bg-[#3d2b1f] transition-all shadow-md flex items-center space-x-2">
+            <i class="fas fa-plus"></i>
+            <span>记录此刻</span>
+        </button>
+    </nav>
+
+    <main class="max-w-5xl mx-auto px-6 mt-8">
+        <header class="mb-12">
+            <h2 id="greeting" class="text-3xl serif font-bold mb-2 text-gray-800">早上好，咖啡师</h2>
+            <p class="text-gray-500 italic">“每一杯咖啡，都是一次与灵魂的对话。”</p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            <div class="glass-card p-6 rounded-3xl flex items-center space-x-4">
+                <div class="bg-orange-100 p-4 rounded-2xl text-orange-600"><i class="fas fa-calendar-check text-2xl"></i></div>
+                <div><p class="text-sm text-gray-500">累计记录</p><p id="total-count" class="text-2xl font-bold">0 杯</p></div>
+            </div>
+            <div class="glass-card p-6 rounded-3xl flex items-center space-x-4">
+                <div class="bg-blue-100 p-4 rounded-2xl text-blue-600"><i class="fas fa-heart text-2xl"></i></div>
+                <div><p class="text-sm text-gray-500">平均幸福感</p><p id="avg-rating" class="text-2xl font-bold">0.0</p></div>
+            </div>
+            <div class="glass-card p-6 rounded-3xl flex items-center space-x-4">
+                <div class="bg-green-100 p-4 rounded-2xl text-green-600"><i class="fas fa-leaf text-2xl"></i></div>
+                <div><p class="text-sm text-gray-500">最爱豆子</p><p id="fav-bean" class="text-lg font-bold truncate w-32">暂无</p></div>
+            </div>
+        </div>
+
+        <section>
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold serif">时光萃取</h3>
+                <div class="text-sm text-gray-400">云端实时同步</div>
+            </div>
+            <div id="diary-container" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+            <div id="empty-state" class="hidden flex flex-col items-center justify-center py-20 text-gray-400">
+                <i class="fas fa-seedling text-6xl mb-4 floating"></i>
+                <p>还没有记录任何咖啡，开始你的第一杯吧！</p>
+            </div>
+        </section>
+    </main>
+
+    <div id="modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 backdrop-blur-sm p-4">
+        <div class="bg-white w-full max-w-lg rounded-[2rem] overflow-hidden shadow-2xl">
+            <div class="coffee-gradient p-8 text-white relative">
+                <button onclick="closeModal()" class="absolute top-6 right-6 text-white/70 hover:text-white"><i class="fas fa-times text-xl"></i></button>
+                <h3 class="text-2xl font-bold serif">记录这杯咖啡</h3>
+            </div>
+            <form id="coffee-form" class="p-8 space-y-5">
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">咖啡豆 / 名称</label>
+                    <input type="text" id="bean-name" required placeholder="例如：耶加雪菲" class="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">冲煮方式</label>
+                        <select id="brew-method" class="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none">
+                            <option value="Hand Drip">手冲</option>
+                            <option value="Espresso">意式浓缩</option>
+                            <option value="Latte">拿铁</option>
+                            <option value="Cold Brew">冷萃</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">评分 (1-5)</label>
+                        <div class="flex items-center space-x-2 py-2" id="star-rating">
+                            <i class="fas fa-star text-gray-300 text-xl rating-star" data-value="1"></i>
+                            <i class="fas fa-star text-gray-300 text-xl rating-star" data-value="2"></i>
+                            <i class="fas fa-star text-gray-300 text-xl rating-star" data-value="3"></i>
+                            <i class="fas fa-star text-gray-300 text-xl rating-star" data-value="4"></i>
+                            <i class="fas fa-star text-gray-300 text-xl rating-star" data-value="5"></i>
+                        </div>
+                    </div>
+                </div>
+                <div><textarea id="notes" rows="3" placeholder="它的风味如何？" class="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none"></textarea></div>
+                <button type="submit" class="w-full bg-[#6f4e37] text-white py-4 rounded-2xl font-bold shadow-lg">同步到云端</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. Supabase 初始化 ---
+        const SUPABASE_URL = 'https://alaommogsejynxbfixyc.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFsYW9tbW9nc2VqeW54YmZpeHljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5ODI2ODEsImV4cCI6MjA4NzU1ODY4MX0.TT26Gl2BvcjAKn9TyMIteKvegIfp1R_98e4rOCingeU';
+        const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let entries = [];
+        let currentRating = 0;
+        const methodIcons = { 'Hand Drip': 'fa-filter', 'Espresso': 'fa-bolt', 'Americano': 'fa-mug-saucer', 'Latte': 'fa-cloud', 'Cold Brew': 'fa-ice-cream', 'French Press': 'fa-flask', 'Moka Pot': 'fa-fire' };
+
+        const modal = document.getElementById('modal');
+        const form = document.getElementById('coffee-form');
+        const container = document.getElementById('diary-container');
+        const emptyState = document.getElementById('empty-state');
+        const stars = document.querySelectorAll('.rating-star');
+
+        // --- 2. 核心逻辑：从云端加载 ---
+        window.onload = async () => {
+            updateGreeting();
+            await fetchFromCloud();
+        };
+
+        async function fetchFromCloud() {
+            const { data, error } = await _supabase.from('coffee_entries').select('*').order('created_at', { ascending: false });
+            if (!error) {
+                entries = data;
+                renderEntries();
+                updateStats();
+            }
+        }
+
+        function updateGreeting() {
+            const hour = new Date().getHours();
+            const greeting = document.getElementById('greeting');
+            if (hour < 12) greeting.innerText = "早上好，咖啡师";
+            else if (hour < 18) greeting.innerText = "下午好，咖啡师";
+            else greeting.innerText = "晚安，咖啡师";
+        }
+
+        stars.forEach(star => {
+            star.addEventListener('click', () => {
+                currentRating = parseInt(star.getAttribute('data-value'));
+                updateStars(currentRating);
+            });
+        });
+
+        function updateStars(val) {
+            stars.forEach((s, idx) => {
+                s.classList.toggle('text-yellow-500', idx < val);
+                s.classList.toggle('text-gray-300', idx >= val);
+            });
+        }
+
+        function openModal() {
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            gsap.from("#modal > div", { y: 50, opacity: 0, duration: 0.4, ease: "power2.out" });
+        }
+
+        function closeModal() {
+            gsap.to("#modal > div", { y: 50, opacity: 0, duration: 0.3, onComplete: () => {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                form.reset();
+                currentRating = 0;
+                updateStars(0);
+            }});
+        }
+
+        // --- 3. 核心逻辑：存入云端 ---
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const entryData = {
+                bean: document.getElementById('bean-name').value,
+                method: document.getElementById('brew-method').value,
+                rating: currentRating || 3,
+                notes: document.getElementById('notes').value
+            };
+
+            const { data, error } = await _supabase.from('coffee_entries').insert([entryData]).select();
+            if (!error) {
+                entries.unshift(data[0]);
+                renderEntries();
+                updateStats();
+                closeModal();
+            }
+        });
+
+        async function deleteEntry(id) {
+            const { error } = await _supabase.from('coffee_entries').delete().eq('id', id);
+            if (!error) {
+                gsap.to(`[data-id="${id}"]`, { opacity: 0, x: 20, duration: 0.3, onComplete: () => {
+                    entries = entries.filter(e => e.id !== id);
+                    renderEntries();
+                    updateStats();
+                }});
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('total-count').innerText = `${entries.length} 杯`;
+            const avg = entries.length ? (entries.reduce((acc, curr) => acc + curr.rating, 0) / entries.length).toFixed(1) : 0;
+            document.getElementById('avg-rating').innerText = avg;
+            const beanCounts = {};
+            entries.forEach(e => beanCounts[e.bean] = (beanCounts[e.bean] || 0) + 1);
+            const topBean = Object.keys(beanCounts).reduce((a, b) => beanCounts[a] > beanCounts[b] ? a : b, "暂无");
+            document.getElementById('fav-bean').innerText = topBean;
+        }
+
+        function renderEntries() {
+            container.innerHTML = '';
+            if (entries.length === 0) { emptyState.classList.remove('hidden'); return; }
+            emptyState.classList.add('hidden');
+
+            entries.forEach((entry) => {
+                const card = document.createElement('div');
+                card.className = 'glass-card p-6 rounded-[2rem] entry-card relative group';
+                card.setAttribute('data-id', entry.id);
+                
+                let starsHtml = '';
+                for(let i=0; i<5; i++) starsHtml += `<i class="fas fa-star ${i < entry.rating ? 'text-yellow-500' : 'text-gray-200'} text-xs"></i>`;
+
+                // 转换云端时间戳
+                const dateStr = new Date(entry.created_at).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+                card.innerHTML = `
+                    <button onclick="deleteEntry(${entry.id})" class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all"><i class="fas fa-trash-alt"></i></button>
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-12 h-12 bg-[#f4ece7] rounded-2xl flex items-center justify-center text-[#6f4e37]"><i class="fas ${methodIcons[entry.method] || 'fa-mug-hot'} text-xl"></i></div>
+                            <div><h4 class="font-bold text-lg leading-tight">${entry.bean}</h4><p class="text-xs text-gray-400 font-medium uppercase tracking-wider">${entry.method}</p></div>
+                        </div>
+                        <div class="text-right"><div class="flex space-x-0.5 mb-1">${starsHtml}</div><p class="text-[10px] text-gray-400 font-bold">${dateStr}</p></div>
+                    </div>
+                    <p class="text-gray-600 text-sm leading-relaxed serif border-l-2 border-[#c0a080]/30 pl-3 py-1">${entry.notes || '没有留下文字。'}</p>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // 注册 PWA 环境
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js'); });
+        }
+    </script>
+</body>
+</html>
