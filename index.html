@@ -7,9 +7,6 @@
     
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="咖啡日记">
-    <link rel="apple-touch-icon" href="icon.png">
-    <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#6f4e37">
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -17,242 +14,396 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Quicksand:wght@300;500;700&display=swap" rel="stylesheet">
+    
     <style>
         :root {
             --coffee-dark: #3d2b1f;
             --coffee-medium: #6f4e37;
             --coffee-light: #c0a080;
             --coffee-cream: #fdfcfb;
-            --accent-green: #6b8e23;
         }
+
         body {
-            font-family: 'Quicksand', 'Noto+Serif+SC', sans-serif;
+            font-family: 'Quicksand', 'Noto Serif SC', sans-serif;
             background-color: var(--coffee-cream);
             color: var(--coffee-dark);
-            background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
-            background-size: 20px 20px;
-            -webkit-tap-highlight-color: transparent;
+            background-image: radial-gradient(rgba(111, 78, 55, 0.05) 1px, transparent 1px);
+            background-size: 30px 30px;
+            overflow-x: hidden;
         }
+
         .serif { font-family: 'Noto Serif SC', serif; }
+
+        /* 隐藏滚动条但保留功能 */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--coffee-light); border-radius: 10px; }
+
         .glass-card {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 0 8px 32px 0 rgba(111, 78, 55, 0.1);
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 10px 40px -10px rgba(111, 78, 55, 0.1);
         }
+
         .coffee-gradient {
-            background: linear-gradient(135deg, #6f4e37 0%, #3d2b1f 100%);
+            background: linear-gradient(135deg, #8d6e63 0%, #3d2b1f 100%);
         }
+
         .rating-star {
             cursor: pointer;
-            transition: transform 0.2s;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        .rating-star:hover {
-            transform: scale(1.2);
-        }
-        .custom-scroll::-webkit-scrollbar {
-            width: 6px;
-        }
-        .custom-scroll::-webkit-scrollbar-thumb {
-            background: var(--coffee-light);
-            border-radius: 10px;
-        }
-        .floating {
-            animation: floating 3s ease-in-out infinite;
-        }
-        @keyframes floating {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-            100% { transform: translateY(0px); }
-        }
+        .rating-star:hover { transform: scale(1.2); }
+
         .entry-card {
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: transform 0.4s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.4s ease;
         }
         .entry-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 12px 40px rgba(0,0,0,0.08);
+            box-shadow: 0 20px 40px -15px rgba(111, 78, 55, 0.15);
         }
+
+        .square-img {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            object-fit: cover;
+            border-radius: 1.25rem;
+            margin-bottom: 1.25rem;
+        }
+
+        #loading-overlay {
+            position: fixed; inset: 0; background: rgba(253, 252, 251, 0.9);
+            display: none; justify-content: center; align-items: center;
+            z-index: 10000; backdrop-filter: blur(8px);
+        }
+
+        .toast {
+            position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%);
+            padding: 1rem 2rem; border-radius: 1rem; background: var(--coffee-dark);
+            color: white; z-index: 10001; opacity: 0; pointer-events: none;
+        }
+
+        /* 呼吸动画 */
+        @keyframes brew {
+            0%, 100% { opacity: 0.5; transform: scale(0.95); }
+            50% { opacity: 1; transform: scale(1.05); }
+        }
+        .brewing-icon { animation: brew 2s infinite ease-in-out; }
     </style>
 </head>
-<body class="min-h-screen pb-20">
+<body class="min-h-screen pb-12">
 
-    <nav class="p-6 flex justify-between items-center max-w-5xl mx-auto">
-        <div class="flex items-center space-x-2">
-            <div class="w-10 h-10 coffee-gradient rounded-xl flex items-center justify-center text-white shadow-lg">
+    <!-- Toast 通知 -->
+    <div id="toast" class="toast shadow-2xl serif">提示消息</div>
+
+    <!-- 全屏加载 -->
+    <div id="loading-overlay">
+        <div class="flex flex-col items-center space-y-4">
+            <div class="relative">
+                <i class="fas fa-mug-hot text-5xl text-[#6f4e37] brewing-icon"></i>
+                <i class="fas fa-seedling absolute -top-2 -right-2 text-green-500 animate-bounce"></i>
+            </div>
+            <p class="text-[#6f4e37] text-lg font-bold serif">正在研磨灵感...</p>
+        </div>
+    </div>
+
+    <nav class="sticky top-0 z-40 p-6 flex justify-between items-center max-w-5xl mx-auto backdrop-blur-md">
+        <div class="flex items-center space-x-3 group cursor-pointer">
+            <div class="w-12 h-12 coffee-gradient rounded-2xl flex items-center justify-center text-white shadow-lg group-hover:rotate-12 transition-transform">
                 <i class="fas fa-mug-hot text-xl"></i>
             </div>
-            <h1 class="text-2xl font-bold tracking-tight serif">Caffé Moment</h1>
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight serif leading-none">Caffé Moment</h1>
+                <span class="text-[10px] uppercase tracking-[0.2em] text-gray-400 font-bold">Coffee Diary</span>
+            </div>
         </div>
-        <button onclick="openModal()" class="bg-[#6f4e37] text-white px-5 py-2.5 rounded-full font-medium hover:bg-[#3d2b1f] transition-all shadow-md flex items-center space-x-2">
-            <i class="fas fa-plus"></i>
-            <span>记录此刻</span>
+        <button onclick="openModal()" class="bg-[#6f4e37] hover:bg-[#3d2b1f] text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-orange-900/10 transition-all active:scale-95">
+            <i class="fas fa-plus mr-2"></i>记录此刻
         </button>
     </nav>
 
-    <main class="max-w-5xl mx-auto px-6 mt-8">
-        <header class="mb-12">
-            <h2 id="greeting" class="text-3xl serif font-bold mb-2 text-gray-800">早上好，咖啡师</h2>
-            <p class="text-gray-500 italic">“每一杯咖啡，都是一次与灵魂的对话。”</p>
+    <main class="max-w-5xl mx-auto px-6 mt-6">
+        <header class="mb-10">
+            <h2 id="greeting" class="text-4xl serif font-bold mb-3 text-gray-800">你好</h2>
+            <p class="text-gray-500 italic flex items-center">
+                <span class="w-8 h-[1px] bg-gray-300 mr-3"></span>
+                “每一杯咖啡，都是一次与灵魂的对话。”
+            </p>
         </header>
 
+        <!-- 统计面板 -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-            <div class="glass-card p-6 rounded-3xl flex items-center space-x-4">
-                <div class="bg-orange-100 p-4 rounded-2xl text-orange-600"><i class="fas fa-calendar-check text-2xl"></i></div>
-                <div><p class="text-sm text-gray-500">累计记录</p><p id="total-count" class="text-2xl font-bold">0 杯</p></div>
+            <div class="glass-card p-6 rounded-[2rem] flex items-center space-x-5">
+                <div class="w-14 h-14 bg-orange-50 rounded-2xl flex items-center justify-center text-orange-600 shadow-inner">
+                    <i class="fas fa-calendar-check text-2xl"></i>
+                </div>
+                <div><p class="text-xs text-gray-400 font-bold uppercase tracking-wider">累计记录</p><p id="total-count" class="text-3xl font-bold">0</p></div>
             </div>
-            <div class="glass-card p-6 rounded-3xl flex items-center space-x-4">
-                <div class="bg-blue-100 p-4 rounded-2xl text-blue-600"><i class="fas fa-heart text-2xl"></i></div>
-                <div><p class="text-sm text-gray-500">平均幸福感</p><p id="avg-rating" class="text-2xl font-bold">0.0</p></div>
+            <div class="glass-card p-6 rounded-[2rem] flex items-center space-x-5">
+                <div class="w-14 h-14 bg-rose-50 rounded-2xl flex items-center justify-center text-rose-500 shadow-inner">
+                    <i class="fas fa-heart text-2xl"></i>
+                </div>
+                <div><p class="text-xs text-gray-400 font-bold uppercase tracking-wider">幸福指数</p><p id="avg-rating" class="text-3xl font-bold">0.0</p></div>
             </div>
-            <div class="glass-card p-6 rounded-3xl flex items-center space-x-4">
-                <div class="bg-green-100 p-4 rounded-2xl text-green-600"><i class="fas fa-leaf text-2xl"></i></div>
-                <div><p class="text-sm text-gray-500">最爱豆子</p><p id="fav-bean" class="text-lg font-bold truncate w-32">暂无</p></div>
+            <div class="glass-card p-6 rounded-[2rem] flex items-center space-x-5">
+                <div class="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 shadow-inner">
+                    <i class="fas fa-leaf text-2xl"></i>
+                </div>
+                <div class="overflow-hidden">
+                    <p class="text-xs text-gray-400 font-bold uppercase tracking-wider">最爱豆子</p>
+                    <p id="fav-bean" class="text-xl font-bold truncate">暂无</p>
+                </div>
             </div>
         </div>
 
-        <section>
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-xl font-bold serif">时光萃取</h3>
-                <div class="text-sm text-gray-400">云端实时同步</div>
+        <!-- 列表容器 -->
+        <div id="diary-container" class="grid grid-cols-1 md:grid-cols-2 gap-8"></div>
+        
+        <!-- 空状态 -->
+        <div id="empty-state" class="hidden flex flex-col items-center justify-center py-32 text-gray-300">
+            <div class="relative mb-6">
+                <i class="fas fa-seedling text-7xl opacity-20 animate-pulse"></i>
             </div>
-            <div id="diary-container" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
-            <div id="empty-state" class="hidden flex flex-col items-center justify-center py-20 text-gray-400">
-                <i class="fas fa-seedling text-6xl mb-4 floating"></i>
-                <p>还没有记录任何咖啡，开始你的第一杯吧！</p>
-            </div>
-        </section>
+            <p class="serif text-xl">云端还没有记录，开始你的第一杯吧</p>
+        </div>
     </main>
 
-    <div id="modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 backdrop-blur-sm p-4">
-        <div class="bg-white w-full max-w-lg rounded-[2rem] overflow-hidden shadow-2xl">
-            <div class="coffee-gradient p-8 text-white relative">
-                <button onclick="closeModal()" class="absolute top-6 right-6 text-white/70 hover:text-white"><i class="fas fa-times text-xl"></i></button>
-                <h3 class="text-2xl font-bold serif">记录这杯咖啡</h3>
+    <!-- 弹窗表单 -->
+    <div id="modal" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 backdrop-blur-md p-4">
+        <div id="modal-content" class="bg-white w-full max-w-lg rounded-[2.5rem] overflow-hidden shadow-2xl relative">
+            <div class="coffee-gradient p-8 text-white">
+                <button onclick="closeModal()" class="absolute top-6 right-6 w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+                <h3 class="text-3xl font-bold serif">记录这杯咖啡</h3>
+                <p class="text-white/70 text-sm mt-1">记录风味，留住光阴</p>
             </div>
-            <form id="coffee-form" class="p-8 space-y-5">
-                <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2">咖啡豆 / 名称</label>
-                    <input type="text" id="bean-name" required placeholder="例如：耶加雪菲" class="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none">
-                </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-2">冲煮方式</label>
-                        <select id="brew-method" class="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none">
+            
+            <form id="coffee-form" class="p-8 space-y-6">
+                <div class="space-y-4">
+                    <input type="text" id="bean-name" required placeholder="咖啡豆名称 (如：耶加雪菲)" 
+                        class="w-full px-5 py-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-[#6f4e37] transition-all">
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <select id="brew-method" class="w-full px-5 py-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-[#6f4e37] appearance-none">
                             <option value="Hand Drip">手冲</option>
                             <option value="Espresso">意式浓缩</option>
                             <option value="Latte">拿铁</option>
                             <option value="Cold Brew">冷萃</option>
+                            <option value="Americano">美式</option>
                         </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-2">评分 (1-5)</label>
-                        <div class="flex items-center space-x-2 py-2" id="star-rating">
-                            <i class="fas fa-star text-gray-300 text-xl rating-star" data-value="1"></i>
-                            <i class="fas fa-star text-gray-300 text-xl rating-star" data-value="2"></i>
-                            <i class="fas fa-star text-gray-300 text-xl rating-star" data-value="3"></i>
-                            <i class="fas fa-star text-gray-300 text-xl rating-star" data-value="4"></i>
-                            <i class="fas fa-star text-gray-300 text-xl rating-star" data-value="5"></i>
+                        <div class="flex items-center justify-center space-x-1 bg-gray-50 rounded-2xl border border-gray-100" id="star-rating">
+                            <i class="fas fa-star text-gray-200 text-lg rating-star" data-value="1"></i>
+                            <i class="fas fa-star text-gray-200 text-lg rating-star" data-value="2"></i>
+                            <i class="fas fa-star text-gray-200 text-lg rating-star" data-value="3"></i>
+                            <i class="fas fa-star text-gray-200 text-lg rating-star" data-value="4"></i>
+                            <i class="fas fa-star text-gray-200 text-lg rating-star" data-value="5"></i>
                         </div>
                     </div>
+
+                    <div class="relative group">
+                        <label for="image-input" class="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-200 rounded-[2rem] cursor-pointer bg-gray-50 hover:bg-gray-100 transition-all overflow-hidden">
+                            <div id="image-upload-ui" class="text-center">
+                                <i class="fas fa-camera-retro text-4xl text-gray-300 mb-2"></i>
+                                <p class="text-sm text-gray-400 font-medium">点击拍摄或上传照片</p>
+                            </div>
+                            <img id="image-preview" class="hidden absolute inset-0 w-full h-full object-cover">
+                            <div id="change-img-hint" class="hidden absolute bottom-2 bg-black/50 text-white text-[10px] px-3 py-1 rounded-full">点击更换</div>
+                        </label>
+                        <input type="file" id="image-input" accept="image/*" class="hidden" />
+                    </div>
+
+                    <textarea id="notes" rows="3" placeholder="写下此刻的感受..." 
+                        class="w-full px-5 py-4 rounded-2xl border border-gray-100 bg-gray-50 outline-none focus:ring-2 focus:ring-[#6f4e37] resize-none transition-all"></textarea>
                 </div>
-                <div><textarea id="notes" rows="3" placeholder="它的风味如何？" class="w-full px-4 py-3 rounded-xl border border-gray-200 outline-none"></textarea></div>
-                <button type="submit" class="w-full bg-[#6f4e37] text-white py-4 rounded-2xl font-bold shadow-lg">同步到云端</button>
+
+                <button type="submit" id="submit-btn" class="w-full coffee-gradient text-white py-5 rounded-[1.5rem] font-bold shadow-xl shadow-orange-900/20 active:scale-95 transition-transform">
+                    保存并同步至云端
+                </button>
             </form>
         </div>
     </div>
 
     <script>
-        // --- 1. Supabase 初始化 ---
+        // --- 初始化 Supabase ---
         const SUPABASE_URL = 'https://alaommogsejynxbfixyc.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFsYW9tbW9nc2VqeW54YmZpeHljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzE5ODI2ODEsImV4cCI6MjA4NzU1ODY4MX0.TT26Gl2BvcjAKn9TyMIteKvegIfp1R_98e4rOCingeU';
         const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         let entries = [];
         let currentRating = 0;
-        const methodIcons = { 'Hand Drip': 'fa-filter', 'Espresso': 'fa-bolt', 'Americano': 'fa-mug-saucer', 'Latte': 'fa-cloud', 'Cold Brew': 'fa-ice-cream', 'French Press': 'fa-flask', 'Moka Pot': 'fa-fire' };
-
-        const modal = document.getElementById('modal');
-        const form = document.getElementById('coffee-form');
-        const container = document.getElementById('diary-container');
-        const emptyState = document.getElementById('empty-state');
-        const stars = document.querySelectorAll('.rating-star');
-
-        // --- 2. 核心逻辑：从云端加载 ---
-        window.onload = async () => {
-            updateGreeting();
-            await fetchFromCloud();
+        const methodIcons = { 
+            'Hand Drip': 'fa-filter', 
+            'Espresso': 'fa-bolt', 
+            'Latte': 'fa-cloud', 
+            'Americano': 'fa-mug-saucer', 
+            'Cold Brew': 'fa-ice-cream'
         };
 
+        // --- DOM 元素 ---
+        const container = document.getElementById('diary-container');
+        const modal = document.getElementById('modal');
+        const modalContent = document.getElementById('modal-content');
+        const form = document.getElementById('coffee-form');
+        const stars = document.querySelectorAll('.rating-star');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const imageInput = document.getElementById('image-input');
+        const imagePreview = document.getElementById('image-preview');
+        const uploadUI = document.getElementById('image-upload-ui');
+
+        window.onload = () => {
+            updateGreeting();
+            fetchFromCloud();
+        };
+
+        // --- 核心功能：图片处理 ---
+        async function getProcessedImage(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.src = e.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const MAX_SIZE = 1200;
+                        let w = img.width, h = img.height;
+                        if (w > h && w > MAX_SIZE) { h *= MAX_SIZE / w; w = MAX_SIZE; }
+                        else if (h > MAX_SIZE) { w *= MAX_SIZE / h; h = MAX_SIZE; }
+                        canvas.width = w; canvas.height = h;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, w, h);
+                        canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.85);
+                    };
+                };
+            });
+        }
+
+        // --- 数据交互 ---
         async function fetchFromCloud() {
+            showLoading(true);
             const { data, error } = await _supabase.from('coffee_entries').select('*').order('created_at', { ascending: false });
+            showLoading(false);
             if (!error) {
                 entries = data;
                 renderEntries();
                 updateStats();
+            } else {
+                showToast("获取数据失败");
             }
         }
 
+        // --- UI 交互 ---
         function updateGreeting() {
             const hour = new Date().getHours();
-            const greeting = document.getElementById('greeting');
-            if (hour < 12) greeting.innerText = "早上好，咖啡师";
-            else if (hour < 18) greeting.innerText = "下午好，咖啡师";
-            else greeting.innerText = "晚安，咖啡师";
+            const g = document.getElementById('greeting');
+            let text = hour < 5 ? "深夜了，咖啡大师" : hour < 11 ? "早上好，咖啡大师" : hour < 14 ? "中午好，咖啡大师" : hour < 18 ? "下午好，咖啡大师" : "晚安，咖啡大师";
+            g.innerText = text;
         }
 
-        stars.forEach(star => {
-            star.addEventListener('click', () => {
-                currentRating = parseInt(star.getAttribute('data-value'));
-                updateStars(currentRating);
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            gsap.to(toast, { opacity: 1, y: -20, duration: 0.4 });
+            setTimeout(() => gsap.to(toast, { opacity: 0, y: 0, duration: 0.4 }), 3000);
+        }
+
+        function showLoading(show) {
+            loadingOverlay.style.display = show ? 'flex' : 'none';
+        }
+
+        // 评分逻辑
+        stars.forEach(s => {
+            s.addEventListener('click', () => {
+                currentRating = parseInt(s.getAttribute('data-value'));
+                stars.forEach((star, i) => {
+                    star.classList.toggle('text-yellow-500', i < currentRating);
+                    star.classList.toggle('text-gray-200', i >= currentRating);
+                });
             });
         });
 
-        function updateStars(val) {
-            stars.forEach((s, idx) => {
-                s.classList.toggle('text-yellow-500', idx < val);
-                s.classList.toggle('text-gray-300', idx >= val);
-            });
-        }
+        // 图片预览
+        imageInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const url = URL.createObjectURL(file);
+                imagePreview.src = url;
+                imagePreview.classList.remove('hidden');
+                uploadUI.classList.add('hidden');
+                document.getElementById('change-img-hint').classList.remove('hidden');
+            }
+        });
 
         function openModal() {
             modal.classList.remove('hidden');
             modal.classList.add('flex');
-            gsap.from("#modal > div", { y: 50, opacity: 0, duration: 0.4, ease: "power2.out" });
+            gsap.fromTo(modalContent, { y: 100, opacity: 0, scale: 0.9 }, { y: 0, opacity: 1, scale: 1, duration: 0.5, ease: "power3.out" });
         }
 
         function closeModal() {
-            gsap.to("#modal > div", { y: 50, opacity: 0, duration: 0.3, onComplete: () => {
+            gsap.to(modalContent, { y: 50, opacity: 0, scale: 0.95, duration: 0.3, onComplete: () => {
                 modal.classList.add('hidden');
-                modal.classList.remove('flex');
                 form.reset();
                 currentRating = 0;
-                updateStars(0);
+                imagePreview.classList.add('hidden');
+                uploadUI.classList.remove('hidden');
+                document.getElementById('change-img-hint').classList.add('hidden');
+                stars.forEach(s => s.classList.replace('text-yellow-500', 'text-gray-200'));
             }});
         }
 
-        // --- 3. 核心逻辑：存入云端 ---
+        // --- 提交逻辑 ---
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
-            const entryData = {
-                bean: document.getElementById('bean-name').value,
-                method: document.getElementById('brew-method').value,
-                rating: currentRating || 3,
-                notes: document.getElementById('notes').value
-            };
+            const btn = document.getElementById('submit-btn');
+            btn.disabled = true;
+            showLoading(true);
 
-            const { data, error } = await _supabase.from('coffee_entries').insert([entryData]).select();
-            if (!error) {
+            try {
+                let imageUrl = null;
+                const file = imageInput.files[0];
+                if (file) {
+                    const blob = await getProcessedImage(file);
+                    const fileName = `coffee_${Date.now()}.jpg`;
+                    const { error: upError } = await _supabase.storage.from('coffee-images').upload(fileName, blob);
+                    if (upError) throw upError;
+                    const { data: urlData } = _supabase.storage.from('coffee-images').getPublicUrl(fileName);
+                    imageUrl = urlData.publicUrl;
+                }
+
+                const { data, error: dbError } = await _supabase.from('coffee_entries').insert([{
+                    bean: document.getElementById('bean-name').value,
+                    method: document.getElementById('brew-method').value,
+                    rating: currentRating || 3,
+                    notes: document.getElementById('notes').value,
+                    image_url: imageUrl
+                }]).select();
+
+                if (dbError) throw dbError;
+
                 entries.unshift(data[0]);
                 renderEntries();
                 updateStats();
+                showToast("记录已保存");
                 closeModal();
+
+            } catch (err) {
+                showToast("同步失败: " + err.message);
+            } finally {
+                showLoading(false);
+                btn.disabled = false;
             }
         });
 
         async function deleteEntry(id) {
+            if (!confirm('确定要删除这段回忆吗？')) return;
             const { error } = await _supabase.from('coffee_entries').delete().eq('id', id);
             if (!error) {
-                gsap.to(`[data-id="${id}"]`, { opacity: 0, x: 20, duration: 0.3, onComplete: () => {
+                const el = document.querySelector(`[data-id="${id}"]`);
+                gsap.to(el, { opacity: 0, scale: 0.8, x: 50, duration: 0.4, onComplete: () => {
                     entries = entries.filter(e => e.id !== id);
                     renderEntries();
                     updateStats();
@@ -260,50 +411,74 @@
             }
         }
 
-        function updateStats() {
-            document.getElementById('total-count').innerText = `${entries.length} 杯`;
-            const avg = entries.length ? (entries.reduce((acc, curr) => acc + curr.rating, 0) / entries.length).toFixed(1) : 0;
-            document.getElementById('avg-rating').innerText = avg;
-            const beanCounts = {};
-            entries.forEach(e => beanCounts[e.bean] = (beanCounts[e.bean] || 0) + 1);
-            const topBean = Object.keys(beanCounts).reduce((a, b) => beanCounts[a] > beanCounts[b] ? a : b, "暂无");
-            document.getElementById('fav-bean').innerText = topBean;
-        }
-
         function renderEntries() {
             container.innerHTML = '';
-            if (entries.length === 0) { emptyState.classList.remove('hidden'); return; }
-            emptyState.classList.add('hidden');
+            if (entries.length === 0) {
+                document.getElementById('empty-state').classList.remove('hidden');
+                return;
+            }
+            document.getElementById('empty-state').classList.add('hidden');
 
-            entries.forEach((entry) => {
+            entries.forEach((e, idx) => {
                 const card = document.createElement('div');
-                card.className = 'glass-card p-6 rounded-[2rem] entry-card relative group';
-                card.setAttribute('data-id', entry.id);
+                card.className = 'glass-card p-6 rounded-[2.5rem] entry-card relative group overflow-hidden';
+                card.setAttribute('data-id', e.id);
                 
                 let starsHtml = '';
-                for(let i=0; i<5; i++) starsHtml += `<i class="fas fa-star ${i < entry.rating ? 'text-yellow-500' : 'text-gray-200'} text-xs"></i>`;
-
-                // 转换云端时间戳
-                const dateStr = new Date(entry.created_at).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                for(let i=0; i<5; i++) {
+                    starsHtml += `<i class="fas fa-star ${i < e.rating ? 'text-yellow-500' : 'text-gray-100'} text-[10px]"></i>`;
+                }
 
                 card.innerHTML = `
-                    <button onclick="deleteEntry(${entry.id})" class="absolute top-4 right-4 opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-all"><i class="fas fa-trash-alt"></i></button>
-                    <div class="flex items-start justify-between mb-4">
-                        <div class="flex items-center space-x-3">
-                            <div class="w-12 h-12 bg-[#f4ece7] rounded-2xl flex items-center justify-center text-[#6f4e37]"><i class="fas ${methodIcons[entry.method] || 'fa-mug-hot'} text-xl"></i></div>
-                            <div><h4 class="font-bold text-lg leading-tight">${entry.bean}</h4><p class="text-xs text-gray-400 font-medium uppercase tracking-wider">${entry.method}</p></div>
+                    <button onclick="deleteEntry(${e.id})" class="absolute top-6 right-6 opacity-0 group-hover:opacity-100 w-8 h-8 rounded-full bg-red-50 text-red-400 hover:bg-red-500 hover:text-white transition-all z-10">
+                        <i class="fas fa-trash-alt text-xs"></i>
+                    </button>
+                    ${e.image_url ? `<img src="${e.image_url}" class="square-img shadow-lg" loading="lazy">` : ''}
+                    <div class="flex justify-between items-start">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-14 h-14 bg-[#fdf5f0] rounded-2xl flex items-center justify-center text-[#6f4e37] shadow-sm">
+                                <i class="fas ${methodIcons[e.method] || 'fa-mug-hot'} text-2xl"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-xl leading-tight text-gray-800">${e.bean}</h4>
+                                <div class="flex items-center mt-1">
+                                    <span class="text-[10px] text-[#c0a080] font-black uppercase tracking-widest mr-3">${e.method}</span>
+                                    <div class="flex space-x-0.5">${starsHtml}</div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="text-right"><div class="flex space-x-0.5 mb-1">${starsHtml}</div><p class="text-[10px] text-gray-400 font-bold">${dateStr}</p></div>
                     </div>
-                    <p class="text-gray-600 text-sm leading-relaxed serif border-l-2 border-[#c0a080]/30 pl-3 py-1">${entry.notes || '没有留下文字。'}</p>
+                    <div class="mt-5 pt-5 border-t border-gray-50">
+                        <p class="text-gray-600 text-sm italic serif leading-relaxed">“${e.notes || '这一刻，唯有咖啡香。'}”</p>
+                        <p class="text-[10px] text-gray-300 font-bold mt-4 tracking-tighter uppercase">
+                            <i class="far fa-clock mr-1"></i> ${new Date(e.created_at).toLocaleString('zh-CN', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                    </div>
                 `;
                 container.appendChild(card);
             });
+
+            gsap.from(".entry-card", {
+                duration: 0.8,
+                opacity: 0,
+                y: 30,
+                stagger: 0.15,
+                ease: "power2.out"
+            });
         }
 
-        // 注册 PWA 环境
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js'); });
+        function updateStats() {
+            document.getElementById('total-count').innerText = entries.length;
+            
+            const avg = entries.length ? (entries.reduce((a, b) => a + b.rating, 0) / entries.length).toFixed(1) : "0.0";
+            document.getElementById('avg-rating').innerText = avg;
+            
+            const beanCounts = {};
+            entries.forEach(e => beanCounts[e.bean] = (beanCounts[e.bean] || 0) + 1);
+            const topBean = Object.keys(beanCounts).length 
+                ? Object.keys(beanCounts).reduce((a, b) => beanCounts[a] > beanCounts[b] ? a : b) 
+                : "暂无";
+            document.getElementById('fav-bean').innerText = topBean;
         }
     </script>
 </body>
