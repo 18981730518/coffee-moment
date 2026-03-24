@@ -22,7 +22,7 @@ export const AppState = {
     fadePower: 1.2,   
     
     pointSize: 0.50,  
-    bloomStrength: 1.25, 
+    bloomStrength: 0.10, 
     exposure: 1.00,   
     damp: 0.80, // 锁定为极小值 0.80，且从 UI 移除
     
