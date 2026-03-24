@@ -42,6 +42,7 @@ function initUI() {
         if(e.key.toLowerCase() === 'h') document.getElementById('ui-container').classList.toggle('hidden-ui'); 
     });
 
+    // 依然保留手动上传功能，供玩家自己玩
     document.getElementById('ply-upload').addEventListener('change', (e) => {
         const file = e.target.files[0]; if (!file) return;
         const overlay = document.getElementById('loader-overlay'); 
@@ -53,7 +54,6 @@ function initUI() {
                     const geometry = new PLYLoader().parse(event.target.result); 
                     createPoints(geometry, false);
                     
-                    // 每次导入新模型，强制重置为 1.0（完全显现）
                     AppState.progress = 1.0; 
                     document.querySelectorAll('input[data-key="progress"]').forEach(el => el.value = 1);
                     document.querySelectorAll('.progress-val-text').forEach(el => el.innerText = "1.000");
@@ -120,9 +120,9 @@ function playEvolveAnimation() {
     const easeStr = `cubic-bezier(${AppState.curve[0]}, ${AppState.curve[1]}, ${AppState.curve[2]}, ${AppState.curve[3]})`;
     
     progressTween = window.gsap.fromTo(AppState, 
-        { progress: 1 }, // 从完全显现 (1) 开始
+        { progress: 1 }, 
         { 
-            progress: 0, // 演化到完全消散 (0)
+            progress: 0, 
             duration: AppState.animSpeed, 
             ease: easeStr, 
             repeat: -1, 
@@ -135,8 +135,34 @@ function playEvolveAnimation() {
     );
 }
 
+// -----------------------------------------------------
+// 🚀 核心新增：自动加载云端的 UFO 模型
+// -----------------------------------------------------
+function loadDefaultUFO() {
+    const overlay = document.getElementById('loader-overlay'); 
+    overlay.classList.add('active');
+    
+    const loader = new PLYLoader();
+    // 直接读取同级目录下的 UFO.ply
+    loader.load('./UFO.ply', function (geometry) {
+        createPoints(geometry, false);
+        
+        // 保证模型加载出来是完整状态 (Progress = 1.0)
+        AppState.progress = 1.0; 
+        document.querySelectorAll('input[data-key="progress"]').forEach(el => el.value = 1);
+        document.querySelectorAll('.progress-val-text').forEach(el => el.innerText = "1.000");
+        document.querySelectorAll('.cam-btn').forEach(b => b.classList.remove('active-cam'));
+        
+        overlay.classList.remove('active');
+    }, undefined, function (error) {
+        console.error('UFO.ply 加载失败，请检查仓库中是否存在该文件:', error);
+        overlay.classList.remove('active');
+    });
+}
+
 initEngine(); 
 initUI(); 
+loadDefaultUFO(); // 启动时立刻执行加载
 animate();
 
 function animate() {
